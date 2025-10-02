@@ -1,13 +1,14 @@
 /* MagicMirror Module: MMM-NOAA-Alerts
- * Shows active NOAA/NWS alerts for configured UGC codes (e.g., SDZ013).
+ * Compact stacked cards: icon + title + effective time ("until ...")
  * Hides itself when there are no alerts.
  */
 Module.register("MMM-NOAA-Alerts", {
   defaults: {
-    zones: [],                       // e.g., ["SDZ013","SDZ014"] (use Z* zones for advisories)
+    zones: [],                       // e.g., ["SDZ013","SDZ014"] (Z* zones recommended for advisories)
     updateInterval: 5 * 60 * 1000,   // 5 minutes
     userAgent: "MMM-NOAA-Alerts/1.0 (you@example.com)",
-    showMultiple: true,              // show all, or only the most urgent if false
+    showMultiple: true,              // show all; if false show only the top one
+    maxCards: 4,                     // cap how many to render at once
     minSeverity: "Minor",            // "Unknown","Minor","Moderate","Severe","Extreme"
     sortBy: "severity"               // "severity" or "expires"
   },
@@ -18,6 +19,12 @@ Module.register("MMM-NOAA-Alerts", {
     this.alerts = [];
     this.loaded = false;
 
+    this._dtFmt = new Intl.DateTimeFormat([], {
+      dateStyle: "short",
+      timeStyle: "short",
+      timeZoneName: "short"          // shows "EDT"/"CST"/etc where available
+    });
+
     this.sendSocketNotification("NOAA_CONFIG", {
       zones: this.config.zones,
       updateInterval: this.config.updateInterval,
@@ -27,10 +34,9 @@ Module.register("MMM-NOAA-Alerts", {
     });
   },
 
-  getStyles() {
-    return ["MMM-NOAA-Alerts.css"];
-  },
+  getStyles() { return ["MMM-NOAA-Alerts.css"]; },
 
+  // Simple event -> emoji mapping
   getEventIcon(eventName = "") {
     const map = {
       "Tornado Warning": "🌪️",
@@ -66,44 +72,52 @@ Module.register("MMM-NOAA-Alerts", {
     return "sev-unknown";
   },
 
+  _fmt(dtISO) {
+    if (!dtISO) return null;
+    const d = new Date(dtISO);
+    if (isNaN(d)) return null;
+    return this._dtFmt.format(d);
+  },
+
   getDom() {
     const wrapper = document.createElement("div");
-    wrapper.className = "noaa-wrapper";
+    wrapper.className = "noaa-stack";
     if (!this.loaded || !this.alerts.length) return wrapper;
 
-    const alerts = this.config.showMultiple ? this.alerts : [this.alerts[0]];
-    alerts.forEach(a => {
+    const src = this.config.showMultiple ? this.alerts : [this.alerts[0]];
+    const alerts = src.slice(0, Math.max(1, this.config.maxCards || 1));
+
+    alerts.forEach((a) => {
       const card = document.createElement("div");
-      card.className = `noaa-alert ${this.sevClass(a.severity)}`;
+      card.className = `noaa-card ${this.sevClass(a.severity)}`;
+
+      // Row: icon + title (single line, ellipsis)
+      const row = document.createElement("div");
+      row.className = "noaa-row";
 
       const icon = document.createElement("div");
       icon.className = "noaa-icon";
       icon.textContent = this.getEventIcon(a.event);
 
-      const body = document.createElement("div");
-      body.className = "noaa-body";
-
       const title = document.createElement("div");
       title.className = "noaa-title";
       title.textContent = a.headline || a.event || "Weather Alert";
 
-      const meta = document.createElement("div");
-      meta.className = "noaa-meta";
-      const where = a.areaDesc ? ` • ${a.areaDesc}` : "";
-      const until = a.expiresLocal ? ` • until ${a.expiresLocal}` : "";
-      meta.textContent = `${a.severity}${where}${until}`;
+      row.appendChild(icon);
+      row.appendChild(title);
 
-      if (a.description) {
-        const desc = document.createElement("div");
-        desc.className = "noaa-desc";
-        desc.textContent = a.description;
-        body.appendChild(desc);
-      }
+      // Time line: "9/27/2025, 11:28 AM EDT until further notice"
+      const eff = this._fmt(a.effective);
+      const exp = this._fmt(a.expires);
+      const time = document.createElement("div");
+      time.className = "noaa-time";
+      time.textContent = eff
+          ? (exp ? `${eff} — until ${exp}` : `${eff} — until further notice`)
+          : (exp ? `Until ${exp}` : "");
 
-      body.prepend(meta);
-      body.prepend(title);
-      card.appendChild(icon);
-      card.appendChild(body);
+      card.appendChild(row);
+      if (time.textContent) card.appendChild(time);
+
       wrapper.appendChild(card);
     });
 
