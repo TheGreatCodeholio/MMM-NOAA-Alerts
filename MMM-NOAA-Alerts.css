@@ -46,28 +46,22 @@
 .noaa-card.sev-minor   { border-left: 6px solid #74b9ff; background: rgba(31,59,99,0.30); }
 .noaa-card.sev-unknown { border-left: 6px solid #bdbdbd; background: rgba(47,47,47,0.30); }
 
-/* Stack bottom_bar vertically; every module becomes a row */
-.region.bottom.bar .container {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: stretch !important;
-  gap: 6px; /* small spacing between rows */
+/* Stack ONLY the direct bottom_bar container (not the nested subregion containers) */
+.region.bottom.bar > .container {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
 }
 
-/* Default row behavior for modules in bottom_bar */
-.region.bottom.bar .container > .module {
-  order: 0;
-  width: 100%;
-  position: relative;
-}
-
-/* Our module should always be the last row in bottom_bar */
-.region.bottom.bar .container > .module.MMM-NOAA-Alerts {
+/* Make our module the last row in bottom_bar regardless of load order */
+.region.bottom.bar > .container > .module[data-module="MMM-NOAA-Alerts"],
+.region.bottom.bar > .container > .module.MMM-NOAA-Alerts,
+.region.bottom.bar > .container > .module.mmm-noaa-alerts {
   order: 9999;
 }
 
-/* Ensure nothing clips us */
-.region.bottom.bar { overflow: visible !important; }
+/* Optional: ensure nothing clips inside bottom_bar’s main container only */
+.region.bottom.bar > .container { overflow: visible; }
 
-/* DEBUG: outline so you can *see* the module's box while testing */
-.region.bottom.bar .container > .module.MMM-NOAA-Alerts { outline: 1px dashed rgba(255,255,255,0.35); }
+
