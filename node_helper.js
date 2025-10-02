@@ -1,124 +1,126 @@
-/* node_helper for MMM-NOAA-Alerts */
-"use strict";
-
-const NodeHelper = require("node_helper");
-const fetch = require("node-fetch"); // v2.x (CommonJS)
-const { DateTime } = require("luxon");
-
-const SEV_RANK = { Unknown: 0, Minor: 1, Moderate: 2, Severe: 3, Extreme: 4 };
-
-module.exports = NodeHelper.create({
-  start() {
-    this.timer = null;
-    this.cfg = null;
-    this.etag = null;
-    this.lastPayload = [];
+/* MagicMirror Module: MMM-NOAA-Alerts
+ * Compact stacked cards: icon + title + effective time ("until ...")
+ * Hides itself when there are no alerts.
+ */
+Module.register("MMM-NOAA-Alerts", {
+  defaults: {
+    zones: [],                       // e.g., ["SDZ013","SDZ014"] (Z* zones recommended for advisories)
+    updateInterval: 5 * 60 * 1000,   // 5 minutes
+    userAgent: "MMM-NOAA-Alerts/1.0 (you@example.com)",
+    showMultiple: true,              // show all; if false show only the top one
+    maxCards: 4,                     // cap how many to render at once
+    minSeverity: "Minor",            // "Unknown","Minor","Moderate","Severe","Extreme"
+    sortBy: "severity"               // "severity" or "expires"
   },
 
-  stop() {
-    if (this.timer) clearInterval(this.timer);
+  requiresVersion: "2.1.0",
+
+  start() {
+    this.alerts = [];
+    this.loaded = false;
+
+    this._dtFmt = new Intl.DateTimeFormat([], {
+      dateStyle: "short",
+      timeStyle: "short",
+      timeZoneName: "short"          // shows "EDT"/"CST"/etc where available
+    });
+
+    this.sendSocketNotification("NOAA_CONFIG", {
+      zones: this.config.zones,
+      updateInterval: this.config.updateInterval,
+      userAgent: this.config.userAgent,
+      minSeverity: this.config.minSeverity,
+      sortBy: this.config.sortBy
+    });
+  },
+
+  getStyles() { return ["MMM-NOAA-Alerts.css"]; },
+
+  // Simple event -> emoji mapping
+  getEventIcon(eventName = "") {
+    const map = {
+      "Tornado Warning": "🌪️",
+      "Severe Thunderstorm Warning": "⛈️",
+      "Flash Flood Warning": "🌊",
+      "Flood Warning": "🌊",
+      "Winter Storm Warning": "❄️",
+      "Blizzard Warning": "🌨️",
+      "High Wind Warning": "💨",
+      "Red Flag Warning": "🔥",
+      "Excessive Heat Warning": "🔥",
+      "Heat Advisory": "🥵",
+      "Wind Chill Warning": "🥶",
+    };
+    return map[eventName] || "⚠️";
   },
 
   socketNotificationReceived(notification, payload) {
-    if (notification === "NOAA_CONFIG") {
-      this.cfg = Object.assign(
-          {
-            zones: [],
-            updateInterval: 5 * 60 * 1000,
-            userAgent: "MMM-NOAA-Alerts/1.0 (you@example.com)",
-            minSeverity: "Minor",
-            sortBy: "severity"
-          },
-          payload || {}
-      );
-
-      if (this.timer) clearInterval(this.timer);
-      this.fetchOnce().catch(() => {});
-      this.timer = setInterval(() => {
-        this.fetchOnce().catch((e) => this.log("Fetch error: " + e));
-      }, Math.max(60_000, Number(this.cfg.updateInterval) || 300_000));
+    if (notification === "NOAA_ALERTS") {
+      this.loaded = true;
+      this.alerts = Array.isArray(payload) ? payload : [];
+      if (!this.alerts.length) this.hide(0); else this.show(300);
+      this.updateDom(300);
     }
   },
 
-  buildUrl() {
-    const zones = (this.cfg.zones || []).filter(Boolean).map(z => z.trim()).join(",");
-    const base = "https://api.weather.gov/alerts/active";
-    const qs = zones ? `?zone=${encodeURIComponent(zones)}` : "";
-    return base + qs;
+  sevClass(sev) {
+    const s = (sev || "Unknown").toLowerCase();
+    if (s === "extreme") return "sev-extreme";
+    if (s === "severe")  return "sev-severe";
+    if (s === "moderate")return "sev-moderate";
+    if (s === "minor")   return "sev-minor";
+    return "sev-unknown";
   },
 
-  async fetchOnce() {
-    if (!this.cfg || !Array.isArray(this.cfg.zones) || this.cfg.zones.length === 0) {
-      this.sendSocketNotification("NOAA_ALERTS", []);
-      return;
-    }
+  _fmt(dtISO) {
+    if (!dtISO) return null;
+    const d = new Date(dtISO);
+    if (isNaN(d)) return null;
+    return this._dtFmt.format(d);
+  },
 
-    const url = this.buildUrl();
-    const headers = {
-      "User-Agent": this.cfg.userAgent || "MMM-NOAA-Alerts/1.0 (you@example.com)",
-      "Accept": "application/geo+json"
-    };
-    if (this.etag) headers["If-None-Match"] = this.etag;
+  getDom() {
+    const wrapper = document.createElement("div");
+    wrapper.className = "noaa-stack";
+    if (!this.loaded || !this.alerts.length) return wrapper;
 
-    const res = await fetch(url, { headers, timeout: 20000 });
-    if (res.status === 304) {
-      this.sendSocketNotification("NOAA_ALERTS", this.lastPayload);
-      return;
-    }
-    if (!res.ok) {
-      this.log(`NWS API ${res.status} ${res.statusText}`);
-      this.sendSocketNotification("NOAA_ALERTS", this.lastPayload);
-      return;
-    }
+    const src = this.config.showMultiple ? this.alerts : [this.alerts[0]];
+    const alerts = src.slice(0, Math.max(1, this.config.maxCards || 1));
 
-    this.etag = res.headers.get("etag") || this.etag;
-    const json = await res.json();
-    const features = Array.isArray(json.features) ? json.features : [];
-    const now = DateTime.now();
+    alerts.forEach((a) => {
+      const card = document.createElement("div");
+      card.className = `noaa-card ${this.sevClass(a.severity)}`;
 
-    let alerts = features.map(f => {
-      const p = f && f.properties ? f.properties : {};
-      const expiresISO = p.expires || p.ends || null;
-      const expiresLocal = expiresISO
-          ? DateTime.fromISO(expiresISO).toLocal().toLocaleString(DateTime.DATETIME_SHORT)
-          : null;
+      // Row: icon + title (single line, ellipsis)
+      const row = document.createElement("div");
+      row.className = "noaa-row";
 
-      return {
-        id: f.id || p.id || p['@id'] || null,   // <-- fixed invalid token here
-        event: p.event || "",
-        headline: p.headline || "",
-        severity: p.severity || "Unknown",
-        urgency: p.urgency || "",
-        certainty: p.certainty || "",
-        areaDesc: p.areaDesc || "",
-        effective: p.effective || p.onset || null,
-        expires: expiresISO,
-        expiresLocal,
-        senderName: p.senderName || "",
-        description: (p.instruction ? `${p.description || ""}\n${p.instruction}` : (p.description || "")).trim()
-      };
+      const icon = document.createElement("div");
+      icon.className = "noaa-icon";
+      icon.textContent = this.getEventIcon(a.event);
+
+      const title = document.createElement("div");
+      title.className = "noaa-title";
+      title.textContent = a.headline || a.event || "Weather Alert";
+
+      row.appendChild(icon);
+      row.appendChild(title);
+
+      // Time line: "9/27/2025, 11:28 AM EDT until further notice"
+      const eff = this._fmt(a.effective);
+      const exp = this._fmt(a.expires);
+      const time = document.createElement("div");
+      time.className = "noaa-time";
+      time.textContent = eff
+          ? (exp ? `${eff} — until ${exp}` : `${eff} — until further notice`)
+          : (exp ? `Until ${exp}` : "");
+
+      card.appendChild(row);
+      if (time.textContent) card.appendChild(time);
+
+      wrapper.appendChild(card);
     });
 
-    const minSevRank = SEV_RANK[this.cfg.minSeverity] ?? 1;
-    alerts = alerts.filter(a => (SEV_RANK[a.severity] ?? 0) >= minSevRank);
-
-    alerts = alerts.filter(a => {
-      if (!a.expires) return true;
-      try { return DateTime.fromISO(a.expires) > now.minus({ minutes: 1 }); }
-      catch { return true; }
-    });
-
-    if (this.cfg.sortBy === "expires") {
-      alerts.sort((a, b) => (a.expires || "").localeCompare(b.expires || ""));
-    } else {
-      alerts.sort((a, b) => (SEV_RANK[b.severity] ?? 0) - (SEV_RANK[a.severity] ?? 0));
-    }
-
-    this.lastPayload = alerts;
-    this.sendSocketNotification("NOAA_ALERTS", alerts);
-  },
-
-  log(msg) {
-    console.log(`[MMM-NOAA-Alerts] ${msg}`);
+    return wrapper;
   }
 });
