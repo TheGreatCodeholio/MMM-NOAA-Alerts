@@ -46,22 +46,4 @@
 .noaa-card.sev-minor   { border-left: 6px solid #74b9ff; background: rgba(31,59,99,0.30); }
 .noaa-card.sev-unknown { border-left: 6px solid #bdbdbd; background: rgba(47,47,47,0.30); }
 
-/* Stack ONLY the direct bottom_bar container (not the nested subregion containers) */
-.region.bottom.bar > .container {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
-}
-
-/* Make our module the last row in bottom_bar regardless of load order */
-.region.bottom.bar > .container > .module[data-module="MMM-NOAA-Alerts"],
-.region.bottom.bar > .container > .module.MMM-NOAA-Alerts,
-.region.bottom.bar > .container > .module.mmm-noaa-alerts {
-  order: 9999;
-}
-
-/* Optional: ensure nothing clips inside bottom_bar’s main container only */
-.region.bottom.bar > .container { overflow: visible; }
-
 

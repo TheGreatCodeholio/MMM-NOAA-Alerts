@@ -87,14 +87,7 @@ Module.register("MMM-NOAA-Alerts", {
       this.alerts = Array.isArray(payload) ? payload : [];
 
       // For debugging, ensure we’re definitely visible, then render immediately.
-      this.show(0);
       this.updateDom(0);
-      setTimeout(() => {
-        const wrapper = document.getElementById(this.identifier);
-        const region = wrapper?.closest(".region.bottom.bar");
-        const container = region?.querySelector(".container") || region;
-        if (container && wrapper) container.appendChild(wrapper);   // move us to be the last row
-      }, 50);
     }
   },
 
