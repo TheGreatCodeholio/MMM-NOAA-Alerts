@@ -4,7 +4,7 @@
  */
 Module.register("MMM-NOAA-Alerts", {
   defaults: {
-    zones: [],                       // e.g., ["SDZ013","SDZ014"] (Z* zones recommended for advisories)
+    zones: [],                       // e.g., ["SDC013","SDC115","SDZ013"]
     updateInterval: 5 * 60 * 1000,   // 5 minutes
     userAgent: "MMM-NOAA-Alerts/1.0 (you@example.com)",
     showMultiple: true,              // show all; if false show only the top one
@@ -22,11 +22,31 @@ Module.register("MMM-NOAA-Alerts", {
     this._dtFmt = new Intl.DateTimeFormat([], {
       dateStyle: "short",
       timeStyle: "short",
-      timeZoneName: "short"          // shows "EDT"/"CST"/etc where available
+      timeZoneName: "short"
     });
 
+    // Send once now (if socket is ready it goes through)...
+    this._sendConfig();
+
+    // ...and try again in a couple seconds in case sockets weren't ready yet.
+    this._resendTimer = setTimeout(() => this._sendConfig(), 2500);
+  },
+
+  // When all modules are started, sockets are definitely up — send again.
+  notificationReceived(notification) {
+    if (notification === "ALL_MODULES_STARTED") {
+      this._sendConfig();
+    }
+  },
+
+  _sendConfig() {
+    // Normalize & log for sanity
+    const zones = (this.config.zones || []).map(z => String(z || "").trim().toUpperCase());
+    // Optional debug log in the browser console:
+    // console.log("[MMM-NOAA-Alerts] sending config", zones);
+
     this.sendSocketNotification("NOAA_CONFIG", {
-      zones: this.config.zones,
+      zones,
       updateInterval: this.config.updateInterval,
       userAgent: this.config.userAgent,
       minSeverity: this.config.minSeverity,
@@ -36,7 +56,6 @@ Module.register("MMM-NOAA-Alerts", {
 
   getStyles() { return ["MMM-NOAA-Alerts.css"]; },
 
-  // Simple event -> emoji mapping
   getEventIcon(eventName = "") {
     const map = {
       "Tornado Warning": "🌪️",
@@ -91,7 +110,6 @@ Module.register("MMM-NOAA-Alerts", {
       const card = document.createElement("div");
       card.className = `noaa-card ${this.sevClass(a.severity)}`;
 
-      // Row: icon + title (single line, ellipsis)
       const row = document.createElement("div");
       row.className = "noaa-row";
 
@@ -106,7 +124,6 @@ Module.register("MMM-NOAA-Alerts", {
       row.appendChild(icon);
       row.appendChild(title);
 
-      // Time line: "9/27/2025, 11:28 AM EDT until further notice"
       const eff = this._fmt(a.effective);
       const exp = this._fmt(a.expires);
       const time = document.createElement("div");
@@ -117,7 +134,6 @@ Module.register("MMM-NOAA-Alerts", {
 
       card.appendChild(row);
       if (time.textContent) card.appendChild(time);
-
       wrapper.appendChild(card);
     });
 
