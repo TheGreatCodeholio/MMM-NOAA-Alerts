@@ -20,11 +20,7 @@ Module.register("MMM-NOAA-Alerts", {
     this.alerts = [];
     this.loaded = false;
 
-    this._dtFmt = new Intl.DateTimeFormat([], {
-      dateStyle: "short",
-      timeStyle: "short",
-      timeZoneName: "short"
-    });
+    this._dtFmt = null;
 
     // Send once now (if socket is ready it goes through)...
     this._sendConfig();
@@ -86,7 +82,7 @@ Module.register("MMM-NOAA-Alerts", {
       this.loaded = true;
       this.alerts = Array.isArray(payload) ? payload : [];
 
-      // For debugging, ensure we’re definitely visible, then render immediately.
+      if (this.alerts.length) this.show(0); else this.hide(0);
       this.updateDom(0);
     }
   },
@@ -104,7 +100,37 @@ Module.register("MMM-NOAA-Alerts", {
     if (!dtISO) return null;
     const d = new Date(dtISO);
     if (isNaN(d)) return null;
-    return this._dtFmt.format(d);
+    this._ensureFormatter();
+    try {
+      return this._dtFmt.format(d);
+    } catch {
+      return d.toLocaleString();
+    }
+  },
+
+  _ensureFormatter() {
+    if (this._dtFmt) return;
+    try {
+      // SAFE: do NOT combine timeZoneName with dateStyle/timeStyle
+      this._dtFmt = new Intl.DateTimeFormat(undefined, {
+        dateStyle: "short",
+        timeStyle: "short"
+      });
+    } catch (e1) {
+      try {
+        // Fallback: explicit fields (works on older ICU)
+        this._dtFmt = new Intl.DateTimeFormat(undefined, {
+          year: "numeric",
+          month: "numeric",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit"
+        });
+      } catch (e2) {
+        // Last-resort fallback
+        this._dtFmt = { format: (d) => (d instanceof Date ? d.toLocaleString() : String(d)) };
+      }
+    }
   },
 
   getDom() {
