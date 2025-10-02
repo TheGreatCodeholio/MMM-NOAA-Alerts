@@ -1,6 +1,4 @@
-.noaa-wrapper {
-  width: 100%;
-}
+.noaa-wrapper { width: 100%; }
 
 .noaa-alert {
   display: grid;
@@ -11,58 +9,19 @@
   margin: 0.35rem 0;
   border-radius: 10px;
   line-height: 1.25;
-  font-size: 16px; /* scale with your mirror's global font size */
+  font-size: 16px;
   box-shadow: 0 2px 10px rgba(0,0,0,0.15);
 }
 
-.noaa-icon {
-  font-size: 1.6rem;
-  line-height: 1;
-  transform: translateY(2px);
-}
-
+.noaa-icon { font-size: 1.6rem; line-height: 1; transform: translateY(2px); }
 .noaa-body { min-width: 0; }
+.noaa-title { font-weight: 700; letter-spacing: 0.2px; margin-bottom: 0.15rem; }
+.noaa-meta { opacity: 0.9; font-weight: 600; margin-bottom: 0.25rem; }
+.noaa-desc { opacity: 0.9; white-space: pre-wrap; }
 
-.noaa-title {
-  font-weight: 700;
-  letter-spacing: 0.2px;
-  margin-bottom: 0.15rem;
-}
-
-.noaa-meta {
-  opacity: 0.9;
-  font-weight: 600;
-  margin-bottom: 0.25rem;
-}
-
-.noaa-desc {
-  opacity: 0.9;
-  white-space: pre-wrap;
-}
-
-/* Severity theming (Bootstrap-ish) */
-.sev-extreme {
-  background: #6b0000; /* deep red */
-  color: #fff;
-  border: 1px solid #ffb3b3;
-}
-.sev-severe {
-  background: #7a2e00; /* deep orange-brown */
-  color: #fff;
-  border: 1px solid #ffd2aa;
-}
-.sev-moderate {
-  background: #6f5d00; /* amber */
-  color: #fffdee;
-  border: 1px solid #ffec99;
-}
-.sev-minor {
-  background: #1f3b63; /* cool info */
-  color: #eef6ff;
-  border: 1px solid #bcdcff;
-}
-.sev-unknown {
-  background: #2f2f2f;
-  color: #e8e8e8;
-  border: 1px solid #bdbdbd;
-}
+/* Severity theming */
+.sev-extreme { background:#6b0000; color:#fff; border:1px solid #ffb3b3; }
+.sev-severe  { background:#7a2e00; color:#fff; border:1px solid #ffd2aa; }
+.sev-moderate{ background:#6f5d00; color:#fffdee; border:1px solid #ffec99; }
+.sev-minor   { background:#1f3b63; color:#eef6ff; border:1px solid #bcdcff; }
+.sev-unknown { background:#2f2f2f; color:#e8e8e8; border:1px solid #bdbdbd; }
