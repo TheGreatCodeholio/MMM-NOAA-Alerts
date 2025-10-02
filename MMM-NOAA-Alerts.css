@@ -45,3 +45,24 @@
 .noaa-card.sev-moderate{ border-left: 6px solid #ffd166; background: rgba(111,93,0,0.30); }
 .noaa-card.sev-minor   { border-left: 6px solid #74b9ff; background: rgba(31,59,99,0.30); }
 .noaa-card.sev-unknown { border-left: 6px solid #bdbdbd; background: rgba(47,47,47,0.30); }
+
+/* Stack bottom_bar modules vertically and pin MMM-NOAA-Alerts to the bottom */
+.region.bottom.bar .container {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.region.bottom.bar .container > .module {
+  order: 0;
+  width: 100%;
+}
+
+.region.bottom.bar .container > .module.MMM-NOAA-Alerts {
+  order: 9999;               /* always last */
+}
+
+/* (Optional) small spacing above our cards so they don't hug the module above */
+.region.bottom.bar .container > .module.MMM-NOAA-Alerts {
+  margin-top: 6px;
+}

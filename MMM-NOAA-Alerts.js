@@ -10,7 +10,8 @@ Module.register("MMM-NOAA-Alerts", {
     showMultiple: true,              // show all; if false show only the top one
     maxCards: 4,                     // cap how many to render at once
     minSeverity: "Minor",            // "Unknown","Minor","Moderate","Severe","Extreme"
-    sortBy: "severity"               // "severity" or "expires"
+    sortBy: "severity",               // "severity" or "expires"
+    stickToBottom: true
   },
 
   requiresVersion: "2.1.0",
@@ -75,10 +76,19 @@ Module.register("MMM-NOAA-Alerts", {
 
   socketNotificationReceived(notification, payload) {
     if (notification === "NOAA_ALERTS") {
+      const count = Array.isArray(payload) ? payload.length : 0;
+      /* eslint-disable no-undef */
+      if (typeof Log !== "undefined" && Log.log) {
+        Log.log(`[MMM-NOAA-Alerts] client received ${count} alert(s)`);
+      }
+      /* eslint-enable no-undef */
+
       this.loaded = true;
       this.alerts = Array.isArray(payload) ? payload : [];
-      if (!this.alerts.length) this.hide(0); else this.show(300);
-      this.updateDom(300);
+
+      // For debugging, ensure we’re definitely visible, then render immediately.
+      this.show(0);
+      this.updateDom(0);
     }
   },
 
@@ -101,6 +111,9 @@ Module.register("MMM-NOAA-Alerts", {
   getDom() {
     const wrapper = document.createElement("div");
     wrapper.className = "noaa-stack";
+
+    wrapper.setAttribute("data-alert-count", String(this.alerts?.length || 0));
+
     if (!this.loaded || !this.alerts.length) return wrapper;
 
     const src = this.config.showMultiple ? this.alerts : [this.alerts[0]];
